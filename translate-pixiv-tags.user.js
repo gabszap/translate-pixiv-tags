@@ -4346,6 +4346,72 @@ function initializePixiv () {
     });
 }
 
+function initializePixivUpload() {
+    console.log("initializePixivUpload() foi chamada!");
+
+    GM_addStyle(/* CSS */`
+        .ex-translated-tags[rulename='pixiv upload recommended tags'] {
+            display: inline-block;
+            margin-left: 0.5em;
+            font-size: 12px;
+        }
+    `);
+
+    // Função para verificar se a tag contém caracteres não-ASCII
+    function hasNonLatinChars(text) {
+        return /[^\x00-\x7F]/.test(text);
+    }
+
+    // Função para escanear e traduzir todas as tags
+    function scanAndTranslate() {
+        // Busca por QUALQUER botão que tenha as classes GTM de tag
+        $("button[class*='gtm-'][class*='tag']").each((i, el) => {
+            const tagText = el.textContent.trim();
+            const $button = $(el);
+
+            // Pula se não tem caracteres não-latinos
+            if (!hasNonLatinChars(tagText)) {
+                return;
+            }
+
+            // Pula se já foi traduzido
+            if ($button.data('ex-translated') || $button.next().hasClass('ex-translated-tags')) {
+                return;
+            }
+
+            // Marca como traduzido
+            $button.data('ex-translated', true);
+
+            console.log("Traduzindo tag:", tagText);
+
+            // Traduz
+            translateTag(el, tagText, {
+                tagPosition: TAG_POSITIONS.afterend,
+                classes: "inline",
+                ruleName: "pixiv upload recommended tags",
+            });
+        });
+    }
+
+    // Escaneia imediatamente
+    scanAndTranslate();
+
+    // Re-escaneia a cada 2 segundos
+    setInterval(scanAndTranslate, 2000);
+
+    // Observer observando mudanças em toda a área de tags
+    const observer = new MutationObserver(scanAndTranslate);
+
+    setTimeout(() => {
+        // Observa o body inteiro para capturar QUALQUER mudança
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+        console.log("Observer iniciado para toda a página");
+    }, 1000);
+}
+
 function initializeNijie () {
     // http://nijie.info/view.php?id=208491
     findAndTranslate("artist", "#pro .user_icon .name, .popup_member > a, #login_illust_detail a", {
@@ -5647,7 +5713,14 @@ function initialize () {
         case "nijie.info":              initializeNijie();          break;
         case "pawoo.net":               initializeMastodon();       break;
         case "dic.pixiv.net":
-        case "www.pixiv.net":           initializePixiv();          break;
+        case "www.pixiv.net":
+            initializePixiv();
+
+            // Adiciona suporte para página de upload
+            if (window.location.pathname.includes("/illustration/create")) {
+                initializePixivUpload();
+            }
+            break;
         case "saucenao.com":            initializeSauceNAO();       break;
         case "seiga.nicovideo.jp":      initializeNicoSeiga();      break;
         case "skeb.jp":                 initializeSkeb();           break;
